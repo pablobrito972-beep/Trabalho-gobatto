@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minhas Tarefas | Kanban Master</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root {
+            --bg: #0f172a; 
+            --card: #1e293b;
+            --task: #334155;
+            --accent: #38bdf8;
+            --done: #22c55e;
+            --doing: #f59e0b;
+            --todo: #94a3b8;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            /* Transição suave para a troca de cores de fundo */
+            transition: background-color 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .header {
+            width: 100%;
+            padding: 20px;
+            text-align: center;
+            background: rgba(30, 41, 59, 0.5);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid #334155;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+        }
+
+        .theme-selector {
+            display: flex;
+            gap: 8px;
+            padding: 0 20px;
+        }
+
+        .color-dot {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid white;
+            transition: transform 0.2s;
+        }
+
+        .color-dot:hover { transform: scale(1.2); }
+
+        .header h1 { margin: 0; font-size: 1.5rem; flex-grow: 1; }
+
+        .input-area {
+            padding: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            max-width: 1100px;
+            margin-top: 10px;
+        }
+
+        input, select, button {
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            background: var(--card);
+            color: white;
+            outline: none;
+            font-size: 1rem;
+        }
+
+        button {
+            background: var(--accent);
+            color: #0f172a;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s ease;
+        }
+
+        button:hover { 
+            opacity: 0.9; 
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(56, 189, 248, 0.3);
+        }
+
+        .dashboard {
+            width: 95%;
+            max-width: 1200px;
+            display: grid;
+            grid-template-columns: 1fr 2.5fr;
+            gap: 25px;
+            margin-top: 20px;
+            padding-bottom: 50px;
+        }
+
+        .chart-container {
+            background: var(--card);
+            padding: 20px;
+            border-radius: 12px;
+            height: fit-content;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .chart-container h3 { text-align: center; color: var(--accent); margin-top: 0; }
+
+        .board { display: flex; gap: 15px; }
+
+        .column {
+            flex: 1;
+            background: var(--card);
+            padding: 15px;
+            border-radius: 12px;
+            min-height: 500px;
+            transition: 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .column.dragover {
+            border-color: var(--accent);
+            background: rgba(56, 189, 248, 0.05);
+        }
+
+        .column h3 {
+            text-align: center;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 1.5px;
+            color: #94a3b8;
+            border-bottom: 2px solid #334155;
+            padding-bottom: 10px;
+        }
+
+        .task {
+            background: var(--task);
+            padding: 15px;
+            margin-bottom: 12px;
+            border-radius: 10px;
+            cursor: grab;
+            position: relative;
+            border-left: 4px solid var(--accent);
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .task strong { display: block; margin-bottom: 8px; font-size: 1rem; }
+        .task small { color: #cbd5e1; font-size: 0.8rem; display: block; margin-top: 4px; }
+
+        .btn-del {
+            background: transparent;
+            color: #ef4444;
+            position: absolute;
+            top: 8px; right: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 900px) {
+            .dashboard { grid-template-columns: 1fr; }
+            .board { flex-direction: column; }
+            .column { min-height: 200px; }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="header">
+    <div style="width: 120px;"></div> <h1>🚀 Minhas Tarefas</h1>
+    <div class="theme-selector" title="Mudar Cor de Fundo">
+        <div class="color-dot" style="background: #0f172a;" onclick="app.changeTheme('#0f172a')"></div>
+        <div class="color-dot" style="background: #1e1b4b;" onclick="app.changeTheme('#1e1b4b')"></div>
+        <div class="color-dot" style="background: #064e3b;" onclick="app.changeTheme('#064e3b')"></div>
+        <div class="color-dot" style="background: #450a0a;" onclick="app.changeTheme('#450a0a')"></div>
+    </div>
+</div>
+
+<div class="input-area">
+    <input id="titulo" placeholder="O que você vai fazer?">
+    <input type="date" id="data">
+    <input type="time" id="hora">
+    <input id="categoria" placeholder="Categoria (ex: Trabalho)">
+    <button onclick="app.add()">Adicionar</button>
+</div>
+
+<div class="dashboard">
+    <div class="chart-container">
+        <h3>📊 Progresso</h3>
+        <canvas id="grafico"></canvas>
+    </div>
+
+    <div class="board">
+        <div class="column" id="todo" ondrop="app.drop(event)" ondragover="app.allowDrop(event)" ondragleave="app.clearDrop(event)">
+            <h3>A Fazer</h3>
+        </div>
+
+        <div class="column" id="doing" ondrop="app.drop(event)" ondragover="app.allowDrop(event)" ondragleave="app.clearDrop(event)">
+            <h3>Em Andamento</h3>
+        </div>
+
+        <div class="column" id="done" ondrop="app.drop(event)" ondragover="app.allowDrop(event)" ondragleave="app.clearDrop(event)">
+            <h3>Concluído</h3>
+        </div>
+    </div>
+</div>
+
+<audio id="som" src="https://www.soundjay.com/buttons/sounds/button-09.mp3"></audio>
+
+<script>
+const app = {
+    tasks: JSON.parse(localStorage.getItem('tarefas_v5_br')) || [],
+    chart: null,
+
+    // Função para mudar o tema com persistência e animação
+    changeTheme(color) {
+        document.documentElement.style.setProperty('--bg', color);
+        localStorage.setItem('tema_escolhido_br', color);
+    },
+
+    save() {
+        localStorage.setItem('tarefas_v5_br', JSON.stringify(this.tasks));
+        this.render();
+    },
+
+    add() {
+        const t = document.getElementById('titulo');
+        const d = document.getElementById('data');
+        const h = document.getElementById('hora');
+        const c = document.getElementById('categoria');
+
+        if (!t.value.trim()) return alert("Por favor, digite um nome para a tarefa.");
+
+        const newTask = {
+            id: "id-" + Date.now(),
+            titulo: t.value,
+            data: d.value,
+            hora: h.value,
+            categoria: c.value || "Geral",
+            status: 'todo'
+        };
+
+        this.tasks.push(newTask);
+        t.value = ""; d.value = ""; h.value = ""; c.value = "";
+        this.save();
+    },
+
+    delete(id) {
+        if(confirm("Tem certeza que deseja excluir esta tarefa?")) {
+            this.tasks = this.tasks.filter(t => t.id !== id);
+            this.save();
+        }
+    },
+
+    allowDrop(e) { 
+        e.preventDefault(); 
+        e.currentTarget.classList.add('dragover');
+    },
+
+    clearDrop(e) {
+        e.currentTarget.classList.remove('dragover');
+    },
+
+    drag(e, id) { e.dataTransfer.setData("text", id); },
+
+    drop(e) {
+        e.preventDefault();
+        const col = e.currentTarget;
+        col.classList.remove('dragover');
+        const id = e.dataTransfer.getData("text");
+        const task = this.tasks.find(t => t.id === id);
+        
+        if (task && task.status !== col.id) {
+            task.status = col.id;
+            document.getElementById('som').play();
+            this.save();
+        }
+    },
+
+    render() {
+        const labels = { todo: 'A Fazer', doing: 'Em Andamento', done: 'Concluído' };
+        ['todo', 'doing', 'done'].forEach(id => {
+            document.getElementById(id).innerHTML = `<h3>${labels[id]}</h3>`;
+        });
+
+        let stats = { todo: 0, doing: 0, done: 0 };
+        this.tasks.forEach(t => {
+            stats[t.status]++;
+            const div = document.createElement('div');
+            div.className = 'task';
+            div.draggable = true;
+            div.ondragstart = (e) => this.drag(e, t.id);
+            
+            // Ajuste para exibição da data no padrão brasileiro
+            const dataBr = t.data ? new Date(t.data + 'T00:00:00').toLocaleDateString('pt-BR') : 'Sem data';
+
+            div.innerHTML = `
+                <button class="btn-del" onclick="app.delete('${t.id}')" title="Excluir">✕</button>
+                <strong>${t.titulo}</strong>
+                <small>📁 ${t.categoria}</small>
+                <small>📅 ${dataBr} ${t.hora ? ' às ' + t.hora : ''}</small>
+            `;
+            document.getElementById(t.status).appendChild(div);
+        });
+        this.updateChart(stats);
+    },
+
+    updateChart(stats) {
+        const ctx = document.getElementById('grafico').getContext('2d');
+        if (this.chart) this.chart.destroy();
+        this.chart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['A Fazer', 'Em Andamento', 'Concluído'],
+                datasets: [{
+                    data: [stats.todo, stats.doing, stats.done],
+                    backgroundColor: ['#94a3b8', '#f59e0b', '#22c55e'],
+                    borderWidth: 0
+                }]
+            },
+            options: { 
+                responsive: true,
+                plugins: { legend: { position: 'bottom', labels: { color: 'white' } } } 
+            }
+        });
+    }
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    const tema = localStorage.getItem('tema_escolhido_br');
+    if(tema) app.changeTheme(tema);
+    app.render();
+});
+</script>
+
+</body>
+</html>
